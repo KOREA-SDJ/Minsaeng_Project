@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>민생지원금 자격 판정 결과</title>
+    <style>
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; margin: 40px; background-color: #f4f7f6; }
+        #container { max-width: 700px; margin: 50px auto; padding: 30px; border: 1px solid #e0e0e0; border-radius: 12px; background-color: #ffffff; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); }
+        h1 { text-align: center; color: #1e88e5; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; margin-bottom: 25px; }
+        .input-group { display: flex; margin-bottom: 20px; }
+        input[type="text"] { flex-grow: 1; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; }
+        button { padding: 12px 20px; background-color: #00897b; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; transition: background-color 0.3s; }
+        button:hover { background-color: #00695c; }
+        #result-box { margin-top: 25px; padding: 20px; border: 1px solid #dcdcdc; border-radius: 8px; background-color: #fdfdfd; }
+        h2 { color: #333; margin-top: 0; }
+        p { margin: 8px 0; font-size: 15px; }
+        strong { font-weight: bold; color: #555; }
+        .status-y { color: #2e7d32; font-weight: bold; font-size: 1.1em; }
+        .status-n { color: #d32f2f; font-weight: bold; font-size: 1.1em; }
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <h1>민생지원금 자격 판정 시스템</h1>
+    <p>사용자 ID를 입력하고 판정 결과를 조회하세요. (예: U005, U014, U013)</p>
+    
+    <div class="input-group">
+        <input type="text" id="user-id-input" placeholder="사용자 ID (예: U005)">
+        <button onclick="fetchResult()">결과 조회</button>
+    </div>
+    
+    <div id="result-box">
+        <h4>조회 버튼을 눌러 판정 결과를 확인하세요.</h4>
+    </div>
+</div>
+
+<script>
+    function fetchResult() {
+        const userId = document.getElementById('user-id-input').value.trim().toUpperCase();
+        const resultBox = document.getElementById('result-box');
+        
+        if (!userId) {
+            resultBox.innerHTML = "<h4>사용자 ID를 입력해 주세요.</h4>";
+            return;
+        }
+
+        resultBox.innerHTML = "<h4>결과 조회 중... 잠시만 기다려주세요.</h4>";
+        
+        // 백엔드 API 호출
+        fetch(`http://127.0.0.1:5000/api/result/${userId}`)
+            .then(response => {
+                if (response.status === 404) {
+                    return response.json().then(data => {
+                        throw new Error(data.message || 'ID를 찾을 수 없습니다.');
+                    });
+                }
+                if (!response.ok) {
+                    throw new Error(`서버 응답 오류 (Status: ${response.status})`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'error') {
+                    resultBox.innerHTML = `<h4 class="status-n">시스템 오류: ${data.message}</h4>`;
+                } else if (data.status === 'not_found') {
+                    resultBox.innerHTML = `<h4 class="status-n">${data.message}</h4>`;
+                } else {
+                    displayResult(data.data);
+                }
+            })
+            .catch(error => {
+                console.error('상세 에러 내용:', error);
+                resultBox.innerHTML = `<h4 class="status-n">오류 발생</h4><p>${error.message}</p>`;
+            });
+    }
+
+    function displayResult(result) {
+        // [추가됨] 여기서 resultBox를 다시 찾아야 합니다.
+        const resultBox = document.getElementById('result-box');
+
+        console.log("받은 데이터:", result);
+
+        const isEligible = result.판정_결과 === '지급 대상';
+        const statusClass = isEligible ? 'status-y' : 'status-n';
+        
+        const reasonText = (result.탈락_사유_상세 && result.탈락_사유_상세 !== '-') 
+                           ? result.탈락_사유_상세 
+                           : '없음';
+        
+        // 지급 예정액이 숫자형이 아닐 경우를 대비해 처리
+        let amount = '0원';
+        if (result.지급_예정액) {
+            // DB에서 Decimal 등으로 올 수 있으므로 숫자로 변환 후 포맷팅
+            amount = Number(result.지급_예정액).toLocaleString('ko-KR') + '원';
+        }
+
+        resultBox.innerHTML = `
+            <h2>${result.신청자_이름} 님의 최종 판정 결과</h2>
+            <hr>
+            <p><strong>사용자 ID:</strong> ${result.사용자_ID}</p>
+            <p><strong>가구원 수:</strong> ${result.가구원_수} 명</p>
+            <p><strong>최종 판정:</strong> <span class="${statusClass}">${result.판정_결과}</span></p>
+            <p><strong>지급 예정액:</strong> <span class="${statusClass}">${amount}</span></p>
+            <p><strong>탈락 사유:</strong> ${reasonText}</p>
+        `;
+    }
+</script>
+
+</body>
+</html>
