@@ -2,108 +2,172 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>민생지원금 자격 판정 결과</title>
+    <title>민생지원금 자격 판정 시스템</title>
     <style>
-        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; margin: 40px; background-color: #f4f7f6; }
-        #container { max-width: 700px; margin: 50px auto; padding: 30px; border: 1px solid #e0e0e0; border-radius: 12px; background-color: #ffffff; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); }
-        h1 { text-align: center; color: #1e88e5; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; margin-bottom: 25px; }
-        .input-group { display: flex; margin-bottom: 20px; }
-        input[type="text"] { flex-grow: 1; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; }
-        button { padding: 12px 20px; background-color: #00897b; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; transition: background-color 0.3s; }
+        body { font-family: 'Malgun Gothic', sans-serif; margin: 40px; background-color: #f4f7f6; text-align: center; }
+        #container { max-width: 700px; margin: 0 auto; padding: 40px; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h1 { color: #1e88e5; margin-bottom: 30px; }
+        
+        .search-box { display: flex; gap: 10px; justify-content: center; margin-bottom: 30px; }
+        input { padding: 12px; width: 60%; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; }
+        button { padding: 12px 24px; background-color: #00897b; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; }
         button:hover { background-color: #00695c; }
-        #result-box { margin-top: 25px; padding: 20px; border: 1px solid #dcdcdc; border-radius: 8px; background-color: #fdfdfd; }
-        h2 { color: #333; margin-top: 0; }
-        p { margin: 8px 0; font-size: 15px; }
-        strong { font-weight: bold; color: #555; }
-        .status-y { color: #2e7d32; font-weight: bold; font-size: 1.1em; }
-        .status-n { color: #d32f2f; font-weight: bold; font-size: 1.1em; }
+
+        #result-area { display: none; margin-top: 30px; text-align: left; border-top: 2px solid #eee; padding-top: 20px; }
+        .result-card { position: relative; background: #e3f2fd; padding: 20px; border-radius: 8px; border-left: 5px solid #2196f3; }
+        .result-card.fail { background: #ffebee; border-left-color: #f44336; }
+        
+        .row { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px dashed #ccc; padding-bottom: 5px; }
+        .label { font-weight: bold; color: #555; }
+        .value { font-weight: bold; color: #333; }
+        .highlight { color: #d32f2f; font-size: 1.1em; }
+        .success { color: #2e7d32; font-size: 1.2em; }
+
+        .links { margin-top: 30px; }
+        a { text-decoration: none; color: #1e88e5; font-weight: bold; }
+
+        .stamp-box {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            border: 3px solid;
+            padding: 5px 10px;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 5px;
+            transform: rotate(-15deg);
+            opacity: 0.8;
+            background-color: rgba(255, 255, 255, 0.7);
+        }
+        .stamp-pass { color: #2e7d32; border-color: #2e7d32; }
+        .stamp-fail { color: #d32f2f; border-color: #d32f2f; }
     </style>
 </head>
 <body>
 
 <div id="container">
     <h1>민생지원금 자격 판정 시스템</h1>
-    <p>사용자 ID를 입력하고 판정 결과를 조회하세요. (예: U005, U014, U013)</p>
     
-    <div class="input-group">
-        <input type="text" id="user-id-input" placeholder="사용자 ID (예: U005)">
-        <button onclick="fetchResult()">결과 조회</button>
+    <div class="search-box">
+        <input type="text" id="userIdInput" placeholder="사용자 ID를 입력하세요 (예: U100)">
+        <button onclick="searchResult()">결과 조회</button>
     </div>
-    
-    <div id="result-box">
-        <h4>조회 버튼을 눌러 판정 결과를 확인하세요.</h4>
+
+    <div id="result-area">
+        <div id="result-content" class="result-card">
+        </div>
+    </div>
+
+    <div class="links">
+        <a href="/">📝 새로운 신청서 작성하기</a>
     </div>
 </div>
 
 <script>
-    function fetchResult() {
-        const userId = document.getElementById('user-id-input').value.trim().toUpperCase();
-        const resultBox = document.getElementById('result-box');
-        
+    /**
+     * 페이지 로드 시 URL 파라미터를 확인하여 ID가 존재하면 자동으로 조회를 실행합니다.
+     */
+    window.onload = function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const id = urlParams.get('id');
+        if (id) {
+            document.getElementById('userIdInput').value = id;
+            searchResult();
+        }
+    };
+
+    /**
+     * 사용자 ID를 기반으로 서버에서 판정 결과를 비동기 조회합니다.
+     * 결과 유무에 따라 UI를 갱신하거나 에러 메시지를 표시합니다.
+     */
+    function searchResult() {
+        const userId = document.getElementById('userIdInput').value.trim();
         if (!userId) {
-            resultBox.innerHTML = "<h4>사용자 ID를 입력해 주세요.</h4>";
+            alert("사용자 ID를 입력해주세요.");
             return;
         }
 
-        resultBox.innerHTML = "<h4>결과 조회 중... 잠시만 기다려주세요.</h4>";
-        
-        // 백엔드 API 호출
-        fetch(`http://127.0.0.1:5000/api/result/${userId}`)
+        const resultArea = document.getElementById('result-area');
+        const resultContent = document.getElementById('result-content');
+
+        // UI 초기화 및 로딩 표시
+        resultArea.style.display = 'block';
+        resultContent.innerHTML = '<p style="text-align:center;">🔍 조회 중입니다...</p>';
+        resultContent.className = 'result-card'; 
+
+        // 데이터 요청
+        fetch(`/api/result/${userId}`)
             .then(response => {
-                if (response.status === 404) {
-                    return response.json().then(data => {
-                        throw new Error(data.message || 'ID를 찾을 수 없습니다.');
-                    });
-                }
                 if (!response.ok) {
-                    throw new Error(`서버 응답 오류 (Status: ${response.status})`);
+                    throw new Error(response.status === 404 ? "해당 ID의 판정 결과가 없습니다." : "서버 오류가 발생했습니다.");
                 }
                 return response.json();
             })
-            .then(data => {
-                if (data.status === 'error') {
-                    resultBox.innerHTML = `<h4 class="status-n">시스템 오류: ${data.message}</h4>`;
-                } else if (data.status === 'not_found') {
-                    resultBox.innerHTML = `<h4 class="status-n">${data.message}</h4>`;
+            .then(res => {
+                if (res.status === 'success') {
+                    renderResult(res.data);
                 } else {
-                    displayResult(data.data);
+                    throw new Error(res.message);
                 }
             })
             .catch(error => {
-                console.error('상세 에러 내용:', error);
-                resultBox.innerHTML = `<h4 class="status-n">오류 발생</h4><p>${error.message}</p>`;
+                resultContent.className = 'result-card fail';
+                resultContent.innerHTML = `<p style="color:red; text-align:center;">❌ ${error.message}</p>`;
             });
     }
 
-    function displayResult(result) {
-        // [추가됨] 여기서 resultBox를 다시 찾아야 합니다.
-        const resultBox = document.getElementById('result-box');
-
-        console.log("받은 데이터:", result);
-
-        const isEligible = result.판정_결과 === '지급 대상';
-        const statusClass = isEligible ? 'status-y' : 'status-n';
+    /**
+     * 조회된 데이터를 기반으로 결과 카드 HTML을 생성하여 렌더링합니다.
+     * 합격/불합격 여부에 따라 스타일(도장, 색상)을 다르게 적용합니다.
+     *
+     * @param {Object} data - 서버로부터 수신한 판정 결과 데이터 객체
+     * @param {string} data.판정_결과 - "지급 대상" 또는 "지급 제외"
+     * @param {number} data.지급_예정액 - 지급 결정된 금액
+     * @param {string} data.탈락_사유_상세 - 탈락 시 표시될 상세 사유
+     */
+    function renderResult(data) {
+        const content = document.getElementById('result-content');
+        const isEligible = data.판정_결과 === '지급 대상';
         
-        const reasonText = (result.탈락_사유_상세 && result.탈락_사유_상세 !== '-') 
-                           ? result.탈락_사유_상세 
-                           : '없음';
-        
-        // 지급 예정액이 숫자형이 아닐 경우를 대비해 처리
-        let amount = '0원';
-        if (result.지급_예정액) {
-            // DB에서 Decimal 등으로 올 수 있으므로 숫자로 변환 후 포맷팅
-            amount = Number(result.지급_예정액).toLocaleString('ko-KR') + '원';
+        // 카드 스타일 및 도장 생성
+        content.className = isEligible ? 'result-card' : 'result-card fail';
+        const stampHtml = isEligible 
+            ? '<div class="stamp-box stamp-pass">✅ 지급 대상</div>' 
+            : '<div class="stamp-box stamp-fail">🚫 지급 제외</div>';
+
+        const payment = new Intl.NumberFormat('ko-KR').format(data.지급_예정액);
+
+        // 탈락 사유 처리 (대상자가 아닐 경우에만 표시)
+        let reasonHtml = '';
+        if (!isEligible) {
+            reasonHtml = `
+            <div class="row" style="border-bottom:none;">
+                <span class="label">상세 사유</span>
+                <span class="value">${data.탈락_사유_상세}</span>
+            </div>`;
         }
 
-        resultBox.innerHTML = `
-            <h2>${result.신청자_이름} 님의 최종 판정 결과</h2>
-            <hr>
-            <p><strong>사용자 ID:</strong> ${result.사용자_ID}</p>
-            <p><strong>가구원 수:</strong> ${result.가구원_수} 명</p>
-            <p><strong>최종 판정:</strong> <span class="${statusClass}">${result.판정_결과}</span></p>
-            <p><strong>지급 예정액:</strong> <span class="${statusClass}">${amount}</span></p>
-            <p><strong>탈락 사유:</strong> ${reasonText}</p>
+        // 최종 HTML 조립
+        const html = `
+            ${stampHtml} 
+            <h2 style="text-align:center; margin-top:0;">
+                ${data.신청자_이름}님의 판정 결과
+            </h2>
+            <div class="row">
+                <span class="label">판정 번호</span>
+                <span class="value">${data.판정_번호}</span>
+            </div>
+            <div class="row">
+                <span class="label">최종 결과</span>
+                <span class="value ${isEligible ? 'success' : 'highlight'}">${data.판정_결과}</span>
+            </div>
+            <div class="row" ${isEligible ? 'style="border-bottom:none;"' : ''}>
+                <span class="label">지급 예정액</span>
+                <span class="value">${payment}원</span>
+            </div>
+            ${reasonHtml}
         `;
+        content.innerHTML = html;
     }
 </script>
 
