@@ -27,13 +27,13 @@
 ## ⚙️ 설치 및 실행 방법 (Installation)
 
 ### 1. 프로젝트 클론 (Clone)
-```bash
-git clone [https://github.com/사용자아이디/minsaeng-project.git](https://github.com/사용자아이디/minsaeng-project.git)
+
+git clone [https://github.com/KOREA-SDJ/minsaeng-project.git](https://github.com/KOREA-SDJ/minsaeng-project.git)
 cd minsaeng-project
 
 ### 2. 가상 환경 설정 및 패키지 설치
 
-```bash
+
 # 가상 환경 생성
 python -m venv venv
 
