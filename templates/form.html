@@ -91,10 +91,20 @@
 
 <script>
     /**
-     * 입력된 숫자 금액을 한글 단위(만, 억, 조)로 변환하여 UI에 표시합니다.
-     *
-     * @param {HTMLInputElement} input - 금액이 입력된 input 요소
-     * @param {string} hintId - 변환된 한글 금액을 출력할 div 요소의 ID
+     * 페이지가 로드되거나 BFCache(뒤로가기 캐시)에서 복원될 때 UI 상태를 초기화합니다.
+     * 특히 폼 제출 버튼의 비활성화 상태를 해제합니다.
+     * * @param {PageTransitionEvent} event - 페이지 전환 이벤트 객체
+     */
+    window.addEventListener('pageshow', function(event) {
+        const submitBtn = document.querySelector('button[type="submit"]');
+        submitBtn.disabled = false;
+        submitBtn.innerText = "판정 결과 확인하기";
+    });
+
+    /**
+     * 입력된 숫자 금액을 한글 단위(만, 억, 조) 문자열로 변환하여 힌트 요소에 표시합니다.
+     * * @param {HTMLInputElement} input - 금액이 입력된 input 요소
+     * @param {string} hintId - 변환된 텍스트를 출력할 HTML 요소의 ID
      */
     function showKoreanMoney(input, hintId) {
         const value = Number(input.value);
@@ -107,56 +117,43 @@
 
         const unitWords = ['', '만', '억', '조'];
         const splitUnit = 10000;
-        let splitCount = unitWords.length;
-        let resultArray = [];
         let resultString = '';
         let tempValue = value;
 
-        for (let i = 0; i < splitCount; i++) {
+        for (let i = 0; i < unitWords.length; i++) {
             let unitResult = (tempValue % Math.pow(splitUnit, i + 1)) / Math.pow(splitUnit, i);
             unitResult = Math.floor(unitResult);
-            if (unitResult > 0) resultArray[i] = unitResult;
-        }
-
-        for (let i = 0; i < resultArray.length; i++) {
-            if (!resultArray[i]) continue;
-            resultString = String(resultArray[i]) + unitWords[i] + ' ' + resultString;
+            if (unitResult > 0) {
+                resultString = String(unitResult) + unitWords[i] + ' ' + resultString;
+            }
         }
 
         hintDiv.innerText = "👉 " + resultString + "원";
     }
 
     /**
-     * 신청서 폼 제출 이벤트를 처리합니다.
-     * 1. 만 나이 검증 (19세 이상)
-     * 2. 폼 데이터 수집
-     * 3. UI 로딩 상태 변경
-     * 4. 비동기 서버 통신 및 결과 처리
-     *
-     * @param {Event} e - submit 이벤트 객체
+     * 신청서 제출 이벤트를 처리합니다.
+     * 나이 검증, 데이터 수집, 서버 전송 및 응답 처리를 수행합니다.
+     * * @param {SubmitEvent} e - 폼 제출 이벤트 객체
      */
     document.getElementById('applyForm').addEventListener('submit', function(e) {
         e.preventDefault();
 
-        // 1. 만 나이 계산 및 검증
         const birthValue = document.getElementById('birth_date').value;
         if (!birthValue) { alert("생년월일을 입력해주세요."); return; }
-        
+
+        // 만 나이 계산 로직
         const birthDate = new Date(birthValue);
         const today = new Date(); 
         let age = today.getFullYear() - birthDate.getFullYear();
         const monthDiff = today.getMonth() - birthDate.getMonth();
-        
-        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) { 
-            age--; 
-        }
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) { age--; }
 
         if (age < 19) {
             alert("죄송합니다.\n만 19세 이상만 신청할 수 있습니다.");
             return; 
         }
 
-        // 2. 데이터 수집
         const formData = {
             user_id: document.getElementById('new_id').value.trim(),
             name: document.getElementById('name').value.trim(),
@@ -172,13 +169,12 @@
             assets: document.getElementById('assets').value
         };
 
-        // 3. UI 로딩 상태 적용
         const submitBtn = document.querySelector('button[type="submit"]');
-        const originalText = submitBtn.innerText;
+        const originalText = "판정 결과 확인하기";
+        
         submitBtn.disabled = true;
         submitBtn.innerText = "⏳ 데이터를 분석하고 있습니다...";
 
-        // 4. 서버 전송
         fetch('/api/apply', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
